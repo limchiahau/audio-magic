@@ -12,6 +12,9 @@ fun main(arg: Array<String>) {
 }
 
 
+///////////////////////////////////////////////////////////////////////////////////////////
+
+
 class EventLoop(val fn: () -> Unit) {
 
     private val delay: Long = 1000 // in miliseconds
@@ -25,7 +28,7 @@ class EventLoop(val fn: () -> Unit) {
 }
 
 
-/////////////////////////////////////////////////////////////////////////////CLASS
+////////////////////////////////////////////////////////////////////////////////////////////
 
 
 object AudioManager {
@@ -63,53 +66,7 @@ object AudioManager {
 }
 
 
-data class AudioOutput(val name: String, val id: Int, val priority: Int, val enabled: Boolean)
-
-
-data class AudioInput(val id: Int)
-
-
-typealias Grid = List<List<String>>
-
-
-//this is a recursive function that ?
-fun Grid.toRows(): Grid {
-    return if (hasNoRows()) {
-        //remove the empty lists
-        dropAll()
-    } else {
-        //call this function again but without the first row
-        dropFirstRow().toRows()
-                .plus(firstRow())
-    }
-}
-
-
-//create a grid composing of the first row of the original grid
-fun Grid.firstRow(): Grid {
-    return map {
-        it.first()
-    }.let(::listOf)
-}
-
-
-//All the inner lists are empty
-fun Grid.hasNoRows(): Boolean = first().isEmpty()
-
-
-fun Grid.dropAll(): Grid {
-    return dropWhile { true }
-}
-
-
-fun Grid.dropFirstRow(): Grid {
-    return map {
-        it.drop(1)
-    }
-}
-
-
-//////////////////////////////////////////////////////////////////////////////////SINGLETON
+//////////////////////////////////////////////////////////////////////////////////////////////
 
 
 object PacMD {
@@ -197,7 +154,44 @@ object PacMD {
 }
 
 
-////////////////////////////////////////////////////////////////////////////////////HELPER
+typealias Grid = List<List<String>>
+
+
+//this is a recursive function that ?
+fun Grid.toRows(): Grid {
+    return if (hasNoRows()) {
+        //remove the empty lists
+        dropAll()
+    } else {
+        //call this function again but without the first row
+        dropFirstRow().toRows()
+                .plus(firstRow())
+    }
+}
+
+
+//create a grid composing of the first row of the original grid
+fun Grid.firstRow(): Grid {
+    return map {
+        it.first()
+    }.let(::listOf)
+}
+
+
+//All the inner lists are empty
+fun Grid.hasNoRows(): Boolean = first().isEmpty()
+
+
+fun Grid.dropAll(): Grid {
+    return dropWhile { true }
+}
+
+
+fun Grid.dropFirstRow(): Grid {
+    return map {
+        it.drop(1)
+    }
+}
 
 
 fun bash(cmd: String): String {
@@ -208,3 +202,15 @@ fun bash(cmd: String): String {
             .reader()
             .readText()
 }
+
+
+/////////////////////////////////////////////////////////////////////////////////////////DATA
+
+
+data class AudioOutput(val name: String, val id: Int, val priority: Int, val enabled: Boolean)
+
+
+data class AudioInput(val id: Int)
+
+
+
