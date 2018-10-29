@@ -1,16 +1,34 @@
 package com.chl.audiomagic
 
 
+import kotlin.concurrent.timer
+
+
 fun main(arg: Array<String>) {
-    val manager = AudioManager()
-    manager.autoSwitchOutput()
+
+    EventLoop(AudioManager::autoSwitchOutput)
+            .start()
+
+}
+
+
+class EventLoop(val fn: () -> Unit) {
+
+    private val delay: Long = 1000 // in miliseconds
+
+    fun start() {
+        timer(period = delay) {
+            fn()
+        }
+    }
+
 }
 
 
 /////////////////////////////////////////////////////////////////////////////CLASS
 
 
-class AudioManager {
+object AudioManager {
 
     //there is no need to switch if the number of outputs are lower than 2
     //1) if there are no outputs there is nothing to switch to.
@@ -95,7 +113,9 @@ fun Grid.dropFirstRow(): Grid {
 
 
 object PacMD {
+
     fun getAudioOutputs(): List<AudioOutput> {
+
         val rawAudioOut = bash("pacmd list-sinks")
 
         //list of regexp to use against rawAudioOut
