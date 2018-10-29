@@ -1,3 +1,9 @@
+/*
+ * Developed by Lim Chia Hau on 10/29/18 6:54 PM.
+ * Last modified 10/29/18 6:53 PM.
+ * Copyright (c) 2018. All rights reserved.
+ */
+
 package com.chl.audiomagic
 
 
