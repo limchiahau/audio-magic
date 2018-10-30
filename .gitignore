@@ -3,3 +3,8 @@ build
 .idea/workspace.xml
 *.snap
 audio-magic_source.tar.bz2
+parts
+prime
+snap
+stage
+

@@ -47,16 +47,16 @@ object AudioManager {
     }
 
     private fun hasOutput(numOutputs: Int): Boolean {
-        return PacMD.getAudioOutputs().size >= numOutputs
+        return PacTL.getAudioOutputs().size >= numOutputs
     }
 
     private fun autoSwitch() {
-        val allOutput = PacMD.getAudioOutputs()
+        val allOutput = PacTL.getAudioOutputs()
         val enabledOutput = getEnabledAudioOutput(allOutput)
         val prioritizedOutput = getPrioritizedAudioOutput(allOutput)
 
         if (enabledOutput != prioritizedOutput)
-            PacMD.setAudioOutputDeviceTo(prioritizedOutput)
+            PacTL.setAudioOutputDeviceTo(prioritizedOutput)
     }
 
     private fun getPrioritizedAudioOutput(list: List<AudioOutput>): AudioOutput {
@@ -75,18 +75,18 @@ object AudioManager {
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 
-object PacMD {
+object PacTL {
 
     fun getAudioOutputs(): List<AudioOutput> {
 
-        val rawAudioOut = bash("pacmd list-sinks")
+        val rawAudioOut = bash("pactl list sinks")
 
         //list of regexp to use against rawAudioOut
         return listOf(
-            "index: [0-9]+",    //ID
-            "name: .+",         //Name
-            "priority [0-9]+",  //Priority
-            ". index: [0-9]+"   //Enabled
+            "Sink #[0-9]+",    //ID
+            "Name: .+",         //Name
+            "priority: [0-9]+",  //Priority
+            "State: [A-W]+"   //Enabled
 
         ).map {
             it.regexp(rawAudioOut)
@@ -110,24 +110,24 @@ object PacMD {
     }
 
     private fun getAudioInputs(): List<AudioInput> {
-        val rawAudioIn = bash("pacmd list-sink-inputs")
+        val rawAudioIn = bash("pactl list sink-inputs")
 
-        return "index: [0-9]+"
+        return "Sink Input #[0-9]+"
                 .regexp(rawAudioIn)
                 .map({it.parseId()})
                 .map(::AudioInput)
     }
 
     private fun moveSinkInput(input: AudioInput, output: AudioOutput) {
-        bash("pacmd move-sink-input ${input.id} ${output.id}")
+        bash("pactl move-sink-input ${input.id} ${output.id}")
     }
 
     private fun setDefaultSink(output: AudioOutput) {
-        bash("pacmd set-default-sink ${output.name}")
+        bash("pactl set-default-sink ${output.name}")
     }
 
     private fun String.parseId(): Int {
-        return split(" ")
+        return split("#")
                 .last()
                 .toInt()
     }
@@ -135,8 +135,6 @@ object PacMD {
     private fun String.parseName(): String {
         return split(" ")
                 .last()
-                .drop(1) //remove the "<" in front
-                .dropLast(1) //"remove the ">" from the back
     }
 
     private fun String.parsePriority(): Int {
@@ -148,7 +146,7 @@ object PacMD {
     //indicates if the audio device is enabled or not
     //in the data, enabled audio output devices will have a * as the prefix
     private fun String.parseEnabled(): Boolean {
-        return contains('*')
+        return contains("RUNNING")
     }
 
     private fun String.regexp(match: String): List<String> {

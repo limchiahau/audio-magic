@@ -1,25 +1,33 @@
 name: audio-magic
-version: '0.1'
+version: '1.0'
 summary: A service for managing audio devices for the Ubuntu operating system.
 description: |
   I was frustrated that I had to change the default audio device manually,
   everytime I plugged in/out my headphones. So I made this app that'll do that
   for you automatically.
-  There are no configuration files to mess with. This app will work once it
-  is installed.
 
-confinement: devmode
+  You will need to install java for this app. To install java:
+  1) Go to the terminal.
+  2) Type "apt install default-jre".
+  3) you may need to type in your password.
+
+  To make this app start at startup:
+  1) Open startup application perferences
+  2) Click add
+  3) type "magic-audio" into the command field. (You can put in any name you want)
+  4) Click add.
+
+  Website: https://github.com/limchiahau/audio-magic
+
+confinement: classic
 
 apps:
   audio-magic:
     command: java -jar $SNAP/audio-magic-1.0-SNAPSHOT.jar
-    daemon: simple
-    plugs: [pulseaudio]
 
 parts:
-  skide:
+  jar:
     source: build/libs/
     plugin: dump
-  jre:
-    source: /home/chl/Downloads/jre-8u191-linux-x64.tar.gz
-    plugin: dump
+
+
