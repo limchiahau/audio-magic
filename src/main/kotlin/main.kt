@@ -4,12 +4,23 @@
  * Copyright (c) 2018. All rights reserved.
  */
 
+
 package com.chl.audiomagic
 
 
 import kotlin.concurrent.timer
 
 
+/*
+ Simple UML
+ Main -> EventLoop -> AudioManager <=> PacTL
+ */
+
+
+/*
+ The Main Object
+ This Object is responsible for user interaction.
+ */
 fun main(arg: Array<String>) {
 
     EventLoop(AudioManager::autoSwitchOutput)
@@ -21,6 +32,10 @@ fun main(arg: Array<String>) {
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 
+/*
+ The Event Loop
+ This class represents the main event loop of the program.
+ */
 class EventLoop(val fn: () -> Unit) {
 
     private val delay: Long = 1000 // in miliseconds
@@ -37,6 +52,12 @@ class EventLoop(val fn: () -> Unit) {
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 
+/*
+ The Audio Manager
+ This object contains most of the logic of this program.
+ It determines when the audio output device should be changed
+ and changes it.
+ */
 object AudioManager {
 
     //there is no need to switch if the number of outputs are lower than 2
@@ -59,15 +80,15 @@ object AudioManager {
             PacTL.setAudioOutputDeviceTo(prioritizedOutput)
     }
 
-    private fun getPrioritizedAudioOutput(list: List<AudioOutput>): AudioOutput {
+    private fun getPrioritizedAudioOutput(list: List<PacTL.AudioOutput>): PacTL.AudioOutput {
         return list
                 .asSequence() //suggested by ide
-                .sortedBy(AudioOutput::priority)
+                .sortedBy(PacTL.AudioOutput::priority)
                 .last()
     }
 
-    private fun getEnabledAudioOutput(list: List<AudioOutput>): AudioOutput? {
-        return list.find(AudioOutput::enabled)
+    private fun getEnabledAudioOutput(list: List<PacTL.AudioOutput>): PacTL.AudioOutput? {
+        return list.find(PacTL.AudioOutput::enabled)
     }
 }
 
@@ -75,11 +96,56 @@ object AudioManager {
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 
+/**
+ PacTL
+ This object is a wrapper for the pactl command line tool that interacts
+ with the pulseaudio server.
+ */
 object PacTL {
 
-    fun getAudioOutputs(): List<AudioOutput> {
+    /**
+     AudioOutput and AudioInput are nested in PacTL and given a internal
+     constructor to guarantee that both of these objects can only
+     be created by PacTL.
+     This avoids situations where AudioOutput and AudioInput are created
+     with invalid data and passed to PacTl.
+     */
+    data class AudioOutput internal constructor(
+            val name: String,
+            val id: Int,
+            val priority: Int,
+            val enabled: Boolean)
 
+    data class AudioInput internal constructor(
+            val id: Int
+    )
+
+    private val cache = Cache<List<AudioOutput>>()
+
+    fun getAudioOutputs(): List<AudioOutput> {
         val rawAudioOut = bash("pactl list sinks")
+
+        val listOfAudioOutput = cache.get(rawAudioOut)
+
+        //println("hitrate : ${cache.hitRate()}")
+
+        return listOfAudioOutput ?:
+
+            parseRawAudioOut(rawAudioOut)
+                    .apply {
+                        cache.cache(rawAudioOut,this)
+                    }
+
+    }
+
+    fun setAudioOutputDeviceTo(output: AudioOutput) {
+        setDefaultSink(output)
+        getAudioInputs().forEach {
+            moveSinkInput(it, output)
+        }
+    }
+
+    private fun parseRawAudioOut(rawAudioOut: String): List<AudioOutput> {
 
         //list of regexp to use against rawAudioOut
         return listOf(
@@ -93,19 +159,12 @@ object PacTL {
 
         }.toRows().map {
             AudioOutput(
-                    id = it.get(0).parseId(),
-                    name = it.get(1).parseName(),
-                    priority = it.get(2).parsePriority(),
-                    enabled = it.get(3).parseEnabled()
+                    id = it[0].parseId(),
+                    name = it[1].parseName(),
+                    priority = it[2].parsePriority(),
+                    enabled = it[3].parseEnabled()
             )
 
-        }
-    }
-
-    fun setAudioOutputDeviceTo(output: AudioOutput) {
-        setDefaultSink(output)
-        getAudioInputs().forEach {
-            moveSinkInput(it, output)
         }
     }
 
@@ -114,7 +173,7 @@ object PacTL {
 
         return "Sink Input #[0-9]+"
                 .regexp(rawAudioIn)
-                .map({it.parseId()})
+                .map {it.parseId()}
                 .map(::AudioInput)
     }
 
@@ -155,13 +214,87 @@ object PacTL {
                 .toList()
                 .map(MatchResult::value)
     }
+
+    private fun bash(cmd: String): String {
+        return Runtime
+                .getRuntime()
+                .exec(cmd)
+                .inputStream
+                .reader()
+                .readText()
+    }
+}
+
+
+class Cache<T>(
+        private val sizeLimit: Int = 1000,
+        private val shouldRecordHitRate: Boolean = false
+    ) {
+
+    private val datastore = HashMap<String, T>()
+    private var numAccess = 0.0
+    private var numHits= 0.0
+
+
+    fun get(key: String): T? {
+        return datastore[key].apply {
+            if (shouldRecordHitRate) { recordHitRate(this) }
+        }
+    }
+
+    fun cache(key: String, data: T) {
+        println(datastore.size)
+        if (isFull()) flushCache()
+        datastore.putIfAbsent(key, data)
+    }
+
+    //Output the hitRate as a double.
+    fun hitRate() : Double =
+      numHits/numAccess
+
+    private fun recordHitRate(obj: T?) =
+        if (obj == null) recordMiss() else recordHit()
+
+    private fun recordHit() {
+        numAccess += 1
+        numHits += 1
+    }
+
+    private fun recordMiss() {
+        numAccess += 1
+    }
+
+    private fun isFull(): Boolean =
+            when(datastore.size) {
+                0 -> false
+                else -> datastore.size >= sizeLimit
+            }
+
+    private fun flushCache() =
+        datastore.clear()
 }
 
 
 typealias Grid = List<List<String>>
 
 
-//this is a recursive function that ?
+/**
+ * This is a recursive function that converts a list like this:
+ *
+ * [[1, 1, 1],
+ * [2, 2, 2],
+ * [3, 3, 3]]
+ *
+ * to
+ *
+ * [[1, 2, 3],
+ * [1, 2, 3],
+ * [1, 2, 3]]
+ *
+ * The purpose of this function is to make the string data obtained from
+ * pactl easier to parse. As the information for each audio output device
+ * are now grouped together in a list.
+ */
 fun Grid.toRows(): Grid {
     return if (hasNoRows()) {
         //remove the empty lists
@@ -175,7 +308,7 @@ fun Grid.toRows(): Grid {
 
 
 //create a grid composing of the first row of the original grid
-fun Grid.firstRow(): Grid {
+private fun Grid.firstRow(): Grid {
     return map {
         it.first()
     }.let(::listOf)
@@ -183,38 +316,20 @@ fun Grid.firstRow(): Grid {
 
 
 //All the inner lists are empty
-fun Grid.hasNoRows(): Boolean = first().isEmpty()
+private fun Grid.hasNoRows(): Boolean = first().isEmpty()
 
 
-fun Grid.dropAll(): Grid {
+private fun Grid.dropAll(): Grid {
     return dropWhile { true }
 }
 
 
-fun Grid.dropFirstRow(): Grid {
+private fun Grid.dropFirstRow(): Grid {
     return map {
         it.drop(1)
     }
 }
 
-
-fun bash(cmd: String): String {
-    return Runtime
-            .getRuntime()
-            .exec(cmd)
-            .inputStream
-            .reader()
-            .readText()
-}
-
-
-/////////////////////////////////////////////////////////////////////////////////////////DATA
-
-
-data class AudioOutput(val name: String, val id: Int, val priority: Int, val enabled: Boolean)
-
-
-data class AudioInput(val id: Int)
 
 
 

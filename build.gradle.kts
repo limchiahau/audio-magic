@@ -14,6 +14,13 @@ repositories {
 
 dependencies {
     compile(kotlin("stdlib-jdk8"))
+
+
+    ////////////////////////////////////////////////////////////////////////TEST
+    testCompile("org.jetbrains.kotlin:kotlin-test-junit:1.2.71")
+
+    testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect:1.2.71")
+    ////////////////////////////////////////////////////////////////////////TEST
 }
 
 tasks.withType<KotlinCompile> {
